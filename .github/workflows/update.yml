@@ -1,0 +1,46 @@
+name: 更新借券雷達
+
+on:
+  schedule:
+    - cron: "30 13 * * *"     # 台北時間每天 21:30（借券與法人資料公布後；週末沒有新資料也會照跑）
+  workflow_dispatch:           # 也可以在 Actions 頁面手動按 Run workflow
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 抓證交所資料
+        env:
+          TZ: Asia/Taipei
+        run: python3 fetch_twse.py 10
+      - name: 產生網頁
+        run: python3 build.py
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
